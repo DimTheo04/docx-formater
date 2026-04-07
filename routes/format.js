@@ -4,6 +4,22 @@ const { processDocx } = require('../utils/docxProcessor');
 
 const router = express.Router();
 
+/**
+ * Sanitize a filename by removing characters that are unsafe across common
+ * operating systems and could be used for path traversal or injection.
+ * @param {string} name  Raw filename (without extension)
+ * @returns {string}
+ */
+function sanitizeBaseName(name) {
+  return name
+    .replace(/[/\\?%*:|"<>]/g, '-') // unsafe FS chars
+    .replace(/\.{2,}/g, '.') // collapse double-dots (path traversal)
+    .replace(/^\.+|\.+$/g, '') // strip leading/trailing dots
+    .trim()
+    .slice(0, 200) // cap length
+    || 'document'; // fallback if everything was stripped
+}
+
 // Configure multer with in-memory storage (stateless – no disk writes)
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -66,7 +82,7 @@ router.post('/format', (req, res) => {
 
       const formattedBuffer = await processDocx(req.file.buffer);
 
-      const baseName = req.file.originalname.replace(/\.docx$/i, '');
+      const baseName = sanitizeBaseName(req.file.originalname.replace(/\.docx$/i, ''));
       const outputName = `formatted_${baseName}.docx`;
 
       res.setHeader(

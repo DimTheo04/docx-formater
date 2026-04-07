@@ -17,6 +17,9 @@ const { DOMParser, XMLSerializer } = require('@xmldom/xmldom');
 // The main WordprocessingML namespace used throughout OOXML documents
 const W_NS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
 
+// Font applied during standardisation (can be overridden via env var)
+const DEFAULT_FONT = process.env.DEFAULT_FONT || 'Calibri';
+
 // ─── Public API ──────────────────────────────────────────────────────────────
 
 /**
@@ -274,8 +277,8 @@ function addPageBreakBefore(doc, p) {
  */
 function standardizeFontsInStyles(stylesXml) {
   return stylesXml
-    .replace(/w:ascii="[^"]+"/g, 'w:ascii="Calibri"')
-    .replace(/w:hAnsi="[^"]+"/g, 'w:hAnsi="Calibri"');
+    .replace(/w:ascii="[^"]+"/g, `w:ascii="${DEFAULT_FONT}"`)
+    .replace(/w:hAnsi="[^"]+"/g, `w:hAnsi="${DEFAULT_FONT}"`);
 }
 
 // ─── Exports ──────────────────────────────────────────────────────────────────
