@@ -4,29 +4,49 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>DOCX Formatter – Auto-Format Your Word Documents</title>
+    <meta
+      name="description"
+      content="Upload a DOCX file and instantly receive a clean, consistently formatted version."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@600;700&display=swap"
+      rel="stylesheet"
+    />
     <link rel="stylesheet" href="/style.css" />
   </head>
   <body>
+    <div class="bg-orb bg-orb-a" aria-hidden="true"></div>
+    <div class="bg-orb bg-orb-b" aria-hidden="true"></div>
+    <div class="bg-grid" aria-hidden="true"></div>
+
     <div class="app">
-      <!-- ── Header ── -->
       <header class="header">
         <div class="container">
-          <div class="logo">
-            <span class="logo-icon" aria-hidden="true">📄</span>
+          <div class="top-badge">Fast, private, and consistent</div>
+          <div class="logo" aria-label="DOCX Formatter">
+            <span class="logo-icon" aria-hidden="true">DF</span>
             <h1>DOCX Formatter</h1>
           </div>
           <p class="tagline">
-            Upload any Word document and get it back perfectly formatted —
-            correct headings, clean spacing, consistent fonts.
+            Convert rough Word files into clean, publication-ready documents in
+            seconds.
+          </p>
+          <p class="sub-tagline">
+            Heading hierarchy, spacing, page breaks, and typography are fixed
+            automatically.
           </p>
         </div>
       </header>
 
-      <!-- ── Main content ── -->
       <main class="main container">
-        <!-- Upload card -->
         <section class="card upload-card" aria-label="File upload">
-          <!-- Drop zone -->
+          <div class="card-heading">
+            <h2>Upload your document</h2>
+            <span class="status-pill" aria-live="polite">Ready</span>
+          </div>
+
           <div
             id="dropZone"
             class="drop-zone"
@@ -34,11 +54,17 @@
             tabindex="0"
             aria-label="Drag and drop a DOCX file here, or click to browse"
           >
-            <div class="drop-zone-icon" aria-hidden="true">⬆️</div>
-            <h2>Drop your DOCX file here</h2>
+            <div class="drop-zone-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" focusable="false">
+                <path
+                  d="M12 3l4.5 4.5-1.4 1.4-2.1-2.1V16h-2V6.8L8.9 8.9 7.5 7.5 12 3zm-7 14h14v4H5v-4z"
+                />
+              </svg>
+            </div>
+            <h3>Drop your DOCX file here</h3>
             <p>
               or
-              <label for="fileInput" class="file-label">browse to upload</label>
+              <label for="fileInput" class="file-label">browse from device</label>
             </p>
             <input
               type="file"
@@ -47,80 +73,80 @@
               hidden
               aria-label="Choose a DOCX file"
             />
-            <p class="file-limit">Maximum file size: 10 MB · Only .docx files</p>
+            <p class="file-limit">Only .docx files, up to 10 MB</p>
           </div>
 
-          <!-- Progress indicator -->
-          <div id="progressSection" class="progress-section hidden" aria-live="polite">
+          <div
+            id="progressSection"
+            class="progress-section hidden"
+            aria-live="polite"
+          >
             <div class="progress-bar" role="progressbar" aria-label="Formatting progress">
               <div id="progressFill" class="progress-fill"></div>
             </div>
-            <p id="progressText" class="progress-text">Uploading and formatting…</p>
+            <p id="progressText" class="progress-text">Uploading and formatting...</p>
           </div>
 
-          <!-- Success / download section -->
           <div id="downloadSection" class="download-section hidden" aria-live="polite">
-            <div class="success-icon" aria-hidden="true">✅</div>
+            <div class="success-icon" aria-hidden="true">OK</div>
             <h2>Document formatted successfully!</h2>
             <p id="fileName" class="file-name"></p>
             <button id="downloadBtn" class="btn btn-primary">
-              ⬇️&nbsp; Download Formatted Document
+              Download formatted document
             </button>
             <button id="resetBtn" class="btn btn-secondary">
               Format Another Document
             </button>
           </div>
 
-          <!-- Error section -->
           <div id="errorSection" class="error-section hidden" aria-live="assertive">
-            <div class="error-icon" aria-hidden="true">❌</div>
+            <div class="error-icon" aria-hidden="true">!</div>
             <h2>Formatting Failed</h2>
             <p id="errorMessage" class="error-message"></p>
             <button id="retryBtn" class="btn btn-secondary">Try Again</button>
           </div>
         </section>
 
-        <!-- Rules card -->
         <aside class="card rules-card" aria-label="Formatting rules">
-          <h2 class="rules-title">📋 Formatting Rules Applied</h2>
+          <h2 class="rules-title">Formatting Rules Applied</h2>
           <ul class="rules-list">
             <li class="rule-item">
-              <span class="rule-icon" aria-hidden="true">🏗️</span>
+              <span class="rule-icon" aria-hidden="true">01</span>
               <div>
                 <strong>Heading Hierarchy</strong>
                 <p>Enforces proper H1 → H2 → H3 structure, correcting any skipped levels.</p>
               </div>
             </li>
             <li class="rule-item">
-              <span class="rule-icon" aria-hidden="true">1️⃣</span>
+              <span class="rule-icon" aria-hidden="true">02</span>
               <div>
                 <strong>Max 1 H1 Per Page</strong>
                 <p>Ensures each page has at most one top-level heading by inserting page breaks where needed.</p>
               </div>
             </li>
             <li class="rule-item">
-              <span class="rule-icon" aria-hidden="true">🧹</span>
+              <span class="rule-icon" aria-hidden="true">03</span>
               <div>
                 <strong>Remove Extra Spaces</strong>
                 <p>Strips redundant blank paragraphs, keeping at most one between content blocks.</p>
               </div>
             </li>
             <li class="rule-item">
-              <span class="rule-icon" aria-hidden="true">🔤</span>
+              <span class="rule-icon" aria-hidden="true">04</span>
               <div>
                 <strong>Font Standardisation</strong>
                 <p>Applies a consistent Calibri font to all body text and headings.</p>
               </div>
             </li>
             <li class="rule-item">
-              <span class="rule-icon" aria-hidden="true">📄</span>
+              <span class="rule-icon" aria-hidden="true">05</span>
               <div>
                 <strong>Page Break Rules</strong>
                 <p>Inserts logical page breaks so headings never orphan at the bottom of a page.</p>
               </div>
             </li>
             <li class="rule-item">
-              <span class="rule-icon" aria-hidden="true">🖼️</span>
+              <span class="rule-icon" aria-hidden="true">06</span>
               <div>
                 <strong>Image Preservation</strong>
                 <p>All embedded images and media are kept intact in the formatted output.</p>
@@ -130,7 +156,6 @@
         </aside>
       </main>
 
-      <!-- ── Footer ── -->
       <footer class="footer">
         <div class="container">
           <p>DOCX Formatter · Free · No account required · Files are never stored</p>

@@ -3,6 +3,11 @@ const multer = require('multer');
 const { processDocx } = require('../utils/docxProcessor');
 
 const router = express.Router();
+const MAX_UPLOAD_MB = Math.max(
+  Number.parseInt(process.env.MAX_UPLOAD_MB || '10', 10) || 10,
+  1
+);
+const MAX_UPLOAD_BYTES = MAX_UPLOAD_MB * 1024 * 1024;
 
 /**
  * Sanitize a filename by removing characters that are unsafe across common
@@ -24,7 +29,7 @@ function sanitizeBaseName(name) {
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 10 * 1024 * 1024 // 10 MB
+    fileSize: MAX_UPLOAD_BYTES
   },
   fileFilter: (req, file, cb) => {
     const isDocx =
@@ -55,7 +60,7 @@ router.post('/format', (req, res) => {
       if (multerErr.code === 'LIMIT_FILE_SIZE') {
         return res.status(400).json({
           success: false,
-          message: 'File size exceeds the 10 MB limit.'
+          message: `File size exceeds the ${MAX_UPLOAD_MB} MB limit.`
         });
       }
       if (multerErr.message && multerErr.message.includes('Only DOCX files')) {
@@ -97,9 +102,20 @@ router.post('/format', (req, res) => {
       res.send(formattedBuffer);
     } catch (err) {
       console.error('Error formatting document:', err);
+
+      const errMsg = (err && err.message) || 'Unknown error';
+      const invalidDocx = /invalid docx|zip file|end of central directory/i.test(errMsg);
+
+      if (invalidDocx) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid DOCX file. Please upload a valid .docx document.'
+        });
+      }
+
       res.status(500).json({
         success: false,
-        message: 'Failed to format document: ' + (err.message || 'Unknown error')
+        message: 'Failed to format document: ' + errMsg
       });
     }
   });
