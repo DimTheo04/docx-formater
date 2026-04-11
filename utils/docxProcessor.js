@@ -78,6 +78,7 @@ function applyFormattingRules(xmlContent) {
     // Rules applied in order
     removeExtraEmptyParagraphs(body);
     applyHeadingRules(doc, body);
+    standardizeFontsInDocument(doc, body);
 
     return new XMLSerializer().serializeToString(doc);
   } catch (err) {
@@ -266,6 +267,44 @@ function addPageBreakBefore(doc, p) {
 }
 
 // ─── Rule: Font standardisation ───────────────────────────────────────────────
+
+/**
+ * Force Calibri font on all text runs in the document body.
+ * This ensures direct run formatting (w:rFonts) doesn't override styles.
+ */
+function standardizeFontsInDocument(doc, body) {
+  const runs = body.getElementsByTagNameNS(W_NS, 'r');
+  
+  for (let i = 0; i < runs.length; i++) {
+    const run = runs[i];
+    let rPr = null;
+    
+    // Find or create w:rPr (run properties)
+    const rPrs = run.getElementsByTagNameNS(W_NS, 'rPr');
+    if (rPrs.length > 0) {
+      rPr = rPrs[0];
+    } else {
+      rPr = doc.createElementNS(W_NS, 'w:rPr');
+      // Insert rPr as first child of run
+      run.insertBefore(rPr, run.firstChild);
+    }
+    
+    // Find w:rFonts element
+    const rFontsList = rPr.getElementsByTagNameNS(W_NS, 'rFonts');
+    let rFonts = null;
+    
+    if (rFontsList.length > 0) {
+      rFonts = rFontsList[0];
+    } else {
+      rFonts = doc.createElementNS(W_NS, 'w:rFonts');
+      rPr.insertBefore(rFonts, rPr.firstChild);
+    }
+    
+    // Set both w:ascii and w:hAnsi to Calibri
+    rFonts.setAttribute('w:ascii', DEFAULT_FONT);
+    rFonts.setAttribute('w:hAnsi', DEFAULT_FONT);
+  }
+}
 
 /**
  * Replace all Western-script font names in styles.xml with Calibri.
