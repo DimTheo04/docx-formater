@@ -77,8 +77,11 @@ function applyFormattingRules(xmlContent) {
 
     // Rules applied in order
     removeExtraEmptyParagraphs(body);
+    forceLeftAlignment(doc, body);
     applyHeadingRules(doc, body);
     standardizeFontsInDocument(doc, body);
+    standardizeFontSizesInDocument(doc, body);
+    standardizeColorInDocument(doc, body);
 
     return new XMLSerializer().serializeToString(doc);
   } catch (err) {
@@ -266,6 +269,40 @@ function addPageBreakBefore(doc, p) {
   }
 }
 
+// ─── Rule: Force left alignment on all paragraphs ──────────────────────────────
+
+/**
+ * Set all paragraphs to left alignment (w:jc w:val="left").
+ */
+function forceLeftAlignment(doc, body) {
+  const paragraphs = body.getElementsByTagNameNS(W_NS, 'p');
+  
+  for (let i = 0; i < paragraphs.length; i++) {
+    const p = paragraphs[i];
+    let pPr = null;
+    
+    // Find or create w:pPr
+    const pPrs = p.getElementsByTagNameNS(W_NS, 'pPr');
+    if (pPrs.length > 0) {
+      pPr = pPrs[0];
+    } else {
+      pPr = doc.createElementNS(W_NS, 'w:pPr');
+      p.insertBefore(pPr, p.firstChild);
+    }
+    
+    // Remove any existing w:jc element
+    const existingJc = pPr.getElementsByTagNameNS(W_NS, 'jc');
+    for (let j = existingJc.length - 1; j >= 0; j--) {
+      pPr.removeChild(existingJc[j]);
+    }
+    
+    // Add new w:jc with left alignment
+    const jc = doc.createElementNS(W_NS, 'w:jc');
+    jc.setAttribute('w:val', 'left');
+    pPr.appendChild(jc);
+  }
+}
+
 // ─── Rule: Font standardisation ───────────────────────────────────────────────
 
 /**
@@ -303,6 +340,99 @@ function standardizeFontsInDocument(doc, body) {
     // Set both w:ascii and w:hAnsi to Calibri
     rFonts.setAttribute('w:ascii', DEFAULT_FONT);
     rFonts.setAttribute('w:hAnsi', DEFAULT_FONT);
+  }
+}
+
+/**
+ * Standardize font sizes: body text = 11pt, Heading1 = 18pt, Heading2 = 14pt, Heading3 = 12pt.
+ * Font size in OOXML is stored in half-points, so multiply by 2:
+ * - 11pt = 22 half-points
+ * - 18pt = 36 half-points
+ * - 14pt = 28 half-points
+ * - 12pt = 24 half-points
+ */
+function standardizeFontSizesInDocument(doc, body) {
+  const paragraphs = body.getElementsByTagNameNS(W_NS, 'p');
+  
+  for (let i = 0; i < paragraphs.length; i++) {
+    const p = paragraphs[i];
+    const headingLevel = getHeadingLevel(p);
+    
+    let targetSizeHalfPts;
+    if (headingLevel === 1) {
+      targetSizeHalfPts = '36'; // 18pt
+    } else if (headingLevel === 2) {
+      targetSizeHalfPts = '28'; // 14pt
+    } else if (headingLevel === 3) {
+      targetSizeHalfPts = '24'; // 12pt
+    } else {
+      targetSizeHalfPts = '22'; // 11pt for body
+    }
+    
+    // Apply size to all runs in this paragraph
+    const runs = p.getElementsByTagNameNS(W_NS, 'r');
+    for (let j = 0; j < runs.length; j++) {
+      const run = runs[j];
+      let rPr = null;
+      
+      const rPrs = run.getElementsByTagNameNS(W_NS, 'rPr');
+      if (rPrs.length > 0) {
+        rPr = rPrs[0];
+      } else {
+        rPr = doc.createElementNS(W_NS, 'w:rPr');
+        run.insertBefore(rPr, run.firstChild);
+      }
+      
+      // Remove any existing w:sz and w:szCs elements
+      const existingSz = rPr.getElementsByTagNameNS(W_NS, 'sz');
+      for (let k = existingSz.length - 1; k >= 0; k--) {
+        rPr.removeChild(existingSz[k]);
+      }
+      const existingSzCs = rPr.getElementsByTagNameNS(W_NS, 'szCs');
+      for (let k = existingSzCs.length - 1; k >= 0; k--) {
+        rPr.removeChild(existingSzCs[k]);
+      }
+      
+      // Add new w:sz and w:szCs with standardized size
+      const sz = doc.createElementNS(W_NS, 'w:sz');
+      sz.setAttribute('w:val', targetSizeHalfPts);
+      rPr.appendChild(sz);
+      
+      const szCs = doc.createElementNS(W_NS, 'w:szCs');
+      szCs.setAttribute('w:val', targetSizeHalfPts);
+      rPr.appendChild(szCs);
+    }
+  }
+}
+
+/**
+ * Standardize text color to black (000000) on all runs.
+ */
+function standardizeColorInDocument(doc, body) {
+  const runs = body.getElementsByTagNameNS(W_NS, 'r');
+  
+  for (let i = 0; i < runs.length; i++) {
+    const run = runs[i];
+    let rPr = null;
+    
+    const rPrs = run.getElementsByTagNameNS(W_NS, 'rPr');
+    if (rPrs.length > 0) {
+      rPr = rPrs[0];
+    } else {
+      rPr = doc.createElementNS(W_NS, 'w:rPr');
+      run.insertBefore(rPr, run.firstChild);
+    }
+    
+    // Remove any existing w:color element
+    const existingColors = rPr.getElementsByTagNameNS(W_NS, 'color');
+    for (let j = existingColors.length - 1; j >= 0; j--) {
+      rPr.removeChild(existingColors[j]);
+    }
+    
+    // Add new w:color set to black
+    const color = doc.createElementNS(W_NS, 'w:color');
+    color.setAttribute('w:val', '000000'); // Black
+    rPr.appendChild(color);
   }
 }
 
