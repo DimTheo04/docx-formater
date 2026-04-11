@@ -2,6 +2,7 @@ const express = require('express');
 const path = require('path');
 const cors = require('cors');
 const rateLimit = require('express-rate-limit');
+const helmet = require('helmet');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -49,10 +50,13 @@ const corsOptions = {
 // Required so rate-limit uses real client IP behind Render/Railway/Fly proxies.
 app.set('trust proxy', 1);
 
+// Security headers
+app.use(helmet());
+
 // Middleware
 app.use(cors(corsOptions));
 app.options('*', cors(corsOptions));
-app.use(express.json());
+app.use(express.json({ limit: '15mb' })); // Limit matches MAX_UPLOAD_MB (10MB) + ~5MB overhead
 
 // Emit structured logs for 5xx responses so providers can alert on error spikes.
 app.use((req, res, next) => {
@@ -90,11 +94,20 @@ const apiLimiter = rateLimit({
   }
 });
 
+// Lighter rate limit for health checks (allow more frequent checks)
+const healthLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute window
+  max: 120, // 120 requests per minute is reasonable for health checks
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: (req, res) => false // Don't skip any health checks
+});
+
 // Serve static files from public/
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Health endpoint for uptime checks and platform monitoring.
-app.get('/health', (req, res) => {
+app.get('/health', healthLimiter, (req, res) => {
   res.status(200).json({
     ok: true,
     service: 'docx-formater',
@@ -121,18 +134,31 @@ app.use((err, req, res, next) => {
     });
   }
 
-  if (isDev) {
-    console.error(err.stack);
-  } else {
-    console.error(err.message);
-  }
+  // Do not expose internal error details in production
+  const errorMsg = isDev ? err.message : 'Internal server error';
+  console.error(isDev ? err.stack : err.message);
+  
   res.status(500).json({
     success: false,
-    message: isDev ? err.message : 'Internal server error'
+    message: errorMsg
   });
 });
 
-app.listen(PORT, () => {
+// Create HTTP server with request timeout
+const http = require('http');
+const server = http.createServer(app);
+server.setTimeout(30000); // 30 second timeout for all requests
+
+// Graceful shutdown handler
+process.on('SIGTERM', () => {
+  console.log('SIGTERM received, initiating graceful shutdown...');
+  server.close(() => {
+    console.log('Server closed. Goodbye.');
+    process.exit(0);
+  });
+});
+
+server.listen(PORT, () => {
   console.log(`DOCX Formatter running on http://localhost:${PORT}`);
   console.log(
     `Rate limit: ${RATE_LIMIT_MAX_REQUESTS} requests per ${RATE_LIMIT_WINDOW_MINUTES} minutes`
@@ -140,6 +166,10 @@ app.listen(PORT, () => {
   console.log(
     `CORS allowlist entries: ${corsAllowlist.length > 0 ? corsAllowlist.join(', ') : 'none'}`
   );
+  
+  if (!corsAllowlist.length && process.env.NODE_ENV === 'production') {
+    console.warn('⚠️  WARNING: CORS_ORIGINS not set. API will reject all cross-origin requests.');
+  }
 });
 
 module.exports = app;

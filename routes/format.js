@@ -54,9 +54,23 @@ const upload = multer({
  * and returned as JSON rather than propagating to the global error handler.
  */
 router.post('/format', (req, res) => {
+  // Set request timeout for processing
+  const processingTimeout = setTimeout(() => {
+    if (!res.headersSent) {
+      res.status(408).json({
+        success: false,
+        message: 'Document processing timed out. The document may be too complex or large.'
+      });
+    }
+  }, 25000); // 25 seconds (before server's 30s timeout)
+
+  res.on('finish', () => clearTimeout(processingTimeout));
+
   upload.single('document')(req, res, async (multerErr) => {
     // ── Handle multer-level errors ────────────────────────────────────────────
     if (multerErr) {
+      clearTimeout(processingTimeout);
+      
       if (multerErr.code === 'LIMIT_FILE_SIZE') {
         return res.status(400).json({
           success: false,
@@ -72,7 +86,7 @@ router.post('/format', (req, res) => {
       console.error('Multer error:', multerErr);
       return res.status(400).json({
         success: false,
-        message: multerErr.message || 'File upload failed.'
+        message: 'File upload failed. Please check your file and try again.'
       });
     }
 
@@ -88,7 +102,9 @@ router.post('/format', (req, res) => {
       const formattedBuffer = await processDocx(req.file.buffer);
 
       const baseName = sanitizeBaseName(req.file.originalname.replace(/\.docx$/i, ''));
-      const outputName = `formatted_${baseName}.docx`;
+      // Additional sanitization for output filename
+      const sanitizedName = baseName.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 100);
+      const outputName = `formatted_${sanitizedName || 'document'}.docx`;
 
       res.setHeader(
         'Content-Type',
@@ -101,21 +117,40 @@ router.post('/format', (req, res) => {
       res.setHeader('Content-Length', formattedBuffer.length);
       res.send(formattedBuffer);
     } catch (err) {
-      console.error('Error formatting document:', err);
+      clearTimeout(processingTimeout);
+      console.error('Error formatting document:', err.message);
 
+      // Determine error type without exposing internal details
       const errMsg = (err && err.message) || 'Unknown error';
-      const invalidDocx = /invalid docx|zip file|end of central directory/i.test(errMsg);
+      const isInvalidFile = /invalid docx|zip file|entity|invalid|malformed/i.test(errMsg);
+      const isMemory = /memory|insufficient/i.test(errMsg);
+      const isTimeout = /timeout/i.test(errMsg);
 
-      if (invalidDocx) {
+      if (isInvalidFile) {
         return res.status(400).json({
           success: false,
-          message: 'Invalid DOCX file. Please upload a valid .docx document.'
+          message: 'Invalid DOCX file. Please ensure the file is a valid Word document.'
         });
       }
 
+      if (isMemory) {
+        return res.status(413).json({
+          success: false,
+          message: 'Document is too large to process. Please try a smaller file.'
+        });
+      }
+
+      if (isTimeout) {
+        return res.status(408).json({
+          success: false,
+          message: 'Document processing timed out. Please try a simpler document.'
+        });
+      }
+
+      // Generic error - don't expose details
       res.status(500).json({
         success: false,
-        message: 'Failed to format document: ' + errMsg
+        message: 'Failed to format document. Please try again.'
       });
     }
   });

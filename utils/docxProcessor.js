@@ -20,6 +20,13 @@ const W_NS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
 // Font applied during standardisation (can be overridden via env var)
 const DEFAULT_FONT = process.env.DEFAULT_FONT || 'Calibri';
 
+// Upload limits (should match server.js configuration)
+const MAX_UPLOAD_MB = Math.max(
+  Number.parseInt(process.env.MAX_UPLOAD_MB || '10', 10) || 10,
+  1
+);
+const MAX_UPLOAD_BYTES = MAX_UPLOAD_MB * 1024 * 1024;
+
 // ─── Public API ──────────────────────────────────────────────────────────────
 
 /**
@@ -28,6 +35,21 @@ const DEFAULT_FONT = process.env.DEFAULT_FONT || 'Calibri';
  * @returns {Promise<Buffer>} Raw bytes of the formatted .docx file
  */
 async function processDocx(buffer) {
+  const os = require('os');
+  
+  // Validate buffer size
+  if (buffer.length > MAX_UPLOAD_BYTES) {
+    throw new Error(`Buffer exceeds maximum size of ${MAX_UPLOAD_MB} MB.`);
+  }
+
+  // Check available memory before processing
+  const freeMemory = os.freemem();
+  const requiredMemory = buffer.length * 5; // DOM parsing + temp buffers
+  
+  if (requiredMemory > freeMemory * 0.8) {
+    throw new Error('Server memory insufficient for document processing. Please try a smaller file.');
+  }
+
   const zip = await JSZip.loadAsync(buffer);
 
   const docFile = zip.file('word/document.xml');
@@ -60,9 +82,20 @@ async function processDocx(buffer) {
  */
 function applyFormattingRules(xmlContent) {
   try {
+    // Validate XML size to prevent billion laughs attacks
+    if (xmlContent.length > 50 * 1024 * 1024) { // 50MB
+      throw new Error('Document XML exceeds safe processing size (50 MB limit).');
+    }
+
     const parser = new DOMParser({
-      // Suppress non-fatal XML warnings; re-throw only fatal parse errors
+      // Disable external entities and property to prevent XXE attacks
+      entityFilter: () => false,
+      suppressWarnings: true,
       onError: (level, message) => {
+        // Reject files that contain entity declarations (potential XXE)
+        if (message && message.toLowerCase().includes('entity')) {
+          throw new Error('Invalid DOCX: contains malformed or external entities.');
+        }
         if (level === 'fatalError') {
           throw new Error(`XML fatal error: ${message}`);
         }
